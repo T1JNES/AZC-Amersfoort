@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Amersfoort AZC Kaart</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  html, body, #map { height: 100%; margin: 0; padding: 0; }
+  .legend { background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+  .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const entries = [{"address": "Hockeyveld Caraïben Vathorst 1, Amersfoort, Nederland", "category": "Wenselijk (beoogde azc-locaties)", "toelichting": "Gemeente is eigenaar; bestemmingswijziging mogelijk."}, {"address": "Reinaartpad 1, Amersfoort, Nederland", "category": "Wenselijk (beoogde azc-locaties)", "toelichting": "Gemeente is eigenaar; bestemmingswijziging mogelijk."}, {"address": "Euroweg 99, Amersfoort, Nederland", "category": "Niet wenselijk: behoud huidige bestemming", "toelichting": "Bedrijventerrein bestemming behouden."}, {"address": "Barchman Wuytierslaan 55, Amersfoort, Nederland", "category": "Niet wenselijk: behoud huidige bestemming", "toelichting": "Klooster wordt gehandhaafd."}, {"address": "De Brand, Amersfoort, Nederland", "category": "Huidige opvanglocaties", "toelichting": "Tijdelijke opvang azc (154 plekken)."}];
+
+function colorFor(cat) {
+  if (cat.startsWith("Wenselijk")) return "#2ca02c";
+  if (cat.startsWith("Niet wenselijk: behoud")) return "#9467bd";
+  if (cat.startsWith("Niet wenselijk: andere")) return "#8c564b";
+  if (cat.startsWith("Niet wenselijk: behoud groen")) return "#1f77b4";
+  if (cat.startsWith("Niet wenselijk: te hoge")) return "#d62728";
+  if (cat.startsWith("Niet wenselijk: transformatie")) return "#17becf";
+  if (cat.startsWith("Niet wenselijk: gebrek")) return "#ff7f0e";
+  if (cat.startsWith("Niet wenselijk: te duur")) return "#e377c2";
+  if (cat.startsWith("Kan niet: te klein")) return "#7f7f7f";
+  if (cat.startsWith("Kan niet: niet meer")) return "#bcbd22";
+  if (cat.startsWith("Huidige opvanglocaties")) return "#2ca02c";
+  return "#555";
+}
+
+const map = L.map('map').setView([52.156, 5.387], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; OpenStreetMap-bijdragers'
+}).addTo(map);
+const markers = L.layerGroup().addTo(map);
+
+function geocodeAddress(addr) {
+  const url = new URL('https://nominatim.openstreetmap.org/search');
+  url.searchParams.set('q', addr);
+  url.searchParams.set('format', 'json');
+  url.searchParams.set('limit', '1');
+  return fetch(url).then(r => r.json()).then(arr => arr[0] || null).catch(() => null);
+}
+
+(async function() {
+  const bounds = L.latLngBounds();
+  for (const e of entries) {
+    const geo = await geocodeAddress(e.address);
+    if (!geo) continue;
+    const lat = parseFloat(geo.lat), lon = parseFloat(geo.lon);
+    const color = colorFor(e.category);
+    const marker = L.circleMarker([lat, lon], { radius: 7, color, fillColor: color, fillOpacity: 0.85 })
+      .bindPopup(`<b>${e.address}</b><br/><i>${e.category}</i><br/>${e.toelichting || ""}`);
+    marker.addTo(markers);
+    bounds.extend([lat, lon]);
+  }
+  if (bounds.isValid()) map.fitBounds(bounds.pad(0.1));
+})();
+
+const legend = L.control({position: 'topright'});
+legend.onAdd = function(map) {
+  const div = L.DomUtil.create('div', 'legend');
+  const cats = [
+    "Wenselijk (beoogde azc-locaties)",
+    "Niet wenselijk: behoud huidige bestemming",
+    "Niet wenselijk: andere ontwikkelingen/doelgroepen",
+    "Niet wenselijk: behoud groen/ecologie/buitengebied",
+    "Niet wenselijk: te hoge geluidswaarden",
+    "Niet wenselijk: transformatie Hoefkwartier",
+    "Niet wenselijk: gebrek aan buitenruimte",
+    "Niet wenselijk: te duur / niet langdurig beschikbaar",
+    "Kan niet: te klein",
+    "Kan niet: niet meer beschikbaar",
+    "Huidige opvanglocaties"
+  ];
+  let html = '<b>Legenda</b><br/>';
+  for (const c of cats) {
+    html += `<div><span class="status-dot" style="background:${colorFor(c)}"></span>${c}</div>`;
+  }
+  div.innerHTML = html;
+  return div;
+};
+legend.addTo(map);
+</script>
+</body>
+</html>
